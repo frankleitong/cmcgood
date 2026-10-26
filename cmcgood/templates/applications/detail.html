@@ -1,0 +1,62 @@
+{% extends 'base.html' %}
+{% from '_macros.html' import badge, csrf %}
+{% block title %}申请 #{{ a.id }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>申请 #{{ a.id }} · {{ C.APP_KIND[a.kind] }}</h1>
+    <p class="sub">{{ badge(C.APP_STATUS, a.status) }} 由 {{ a.applicant_name or a.applicant_username }} 提交于 {{ a.created_at|fmt_time }}</p>
+  </div>
+  {% if a.status == 'pending' and a.applicant_id == g.user.id %}
+  <form method="post" action="{{ url_for('applications.withdraw', app_id=a.id) }}" onsubmit="return confirm('确定撤回该申请？')">
+    {{ csrf() }}<button class="btn">撤回申请</button>
+  </form>
+  {% endif %}
+</div>
+
+<div class="grid2">
+  <div class="panel">
+    <dl class="kv">
+      <dt>平台</dt><dd>{{ C.PLATFORMS.get(a.platform) }}</dd>
+      <dt>仓库</dt><dd class="mono">{{ a.namespace }}/{{ a.name }}
+        {% if a.repo_id %} · <a href="{{ url_for('repos.detail', repo_id=a.repo_id) }}">查看登记记录</a>{% endif %}</dd>
+      <dt>用途描述</dt><dd>{{ a.description or '—' }}</dd>
+      <dt>团队</dt><dd>{{ a.team or '—' }}</dd>
+      <dt>负责人</dt><dd>{{ a.owner_name or a.owner_username or '—' }}</dd>
+      <dt>可见性</dt><dd>{{ C.VISIBILITY.get(a.visibility, a.visibility) }}</dd>
+      <dt>{{ '归档理由' if a.kind == 'archive' else '申请理由' }}</dt><dd style="white-space:pre-wrap">{{ a.reason }}</dd>
+    </dl>
+  </div>
+  <div class="panel">
+    {% if a.status == 'pending' %}
+      {% if can_decide %}
+      <h2>审批</h2>
+      {% if a.kind == 'create' %}
+      <p class="muted small">{% if auto_create %}通过后将自动在 {{ C.PLATFORMS.get(a.platform) }} 上创建该仓库并登记。{% else %}通过后会登记到代码仓列表；当前未开启自动创建，需要管理员在平台上手动创建仓库。{% endif %}</p>
+      {% else %}
+      <p class="muted small">通过后该仓库在登记表中标记为「已归档」。</p>
+      {% endif %}
+      <form method="post" action="{{ url_for('applications.decide', app_id=a.id) }}">
+        {{ csrf() }}
+        <div class="field"><textarea name="comment" placeholder="审批意见（驳回时必填）"></textarea></div>
+        <div class="actions">
+          <button class="btn primary" name="action" value="approve">通过</button>
+          <button class="btn danger" name="action" value="reject">驳回</button>
+        </div>
+      </form>
+      {% else %}
+      <p class="muted">等待审批人处理。{% if a.applicant_id == g.user.id and has_role(g.user, 'approver') %}（不能审批自己提交的申请）{% endif %}</p>
+      {% endif %}
+    {% else %}
+      <h2>审批结果</h2>
+      <dl class="kv">
+        <dt>结果</dt><dd>{{ badge(C.APP_STATUS, a.status) }}</dd>
+        <dt>审批人</dt><dd>{{ a.approver_name or a.approver_username or '—' }}</dd>
+        <dt>时间</dt><dd>{{ a.decided_at|fmt_time }}</dd>
+        <dt>意见</dt><dd style="white-space:pre-wrap">{{ a.decision_comment or '—' }}</dd>
+        {% if a.create_result %}<dt>处理结果</dt><dd>{{ a.create_result }}</dd>{% endif %}
+      </dl>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

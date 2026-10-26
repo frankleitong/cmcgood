@@ -1,0 +1,27 @@
+{% extends 'base.html' %}
+{% from '_macros.html' import csrf %}
+{% block title %}{{ '编辑' if repo else '手工登记' }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>{{ '编辑 ' ~ repo.namespace ~ '/' ~ repo.name if repo else '手工登记代码仓' }}</h1>
+    {% if not repo %}<p class="sub">用于登记已经存在、但没走申请流程的仓库。批量导入请用「扫描」页。</p>{% endif %}
+  </div>
+</div>
+<div class="panel" style="max-width:860px">
+  <form method="post">
+    {{ csrf() }}
+    {% set identity = (not repo) or is_admin %}
+    {% set owner_editable = (not repo) or is_admin %}
+    {% include '_repo_fields.html' %}
+    <div class="field">
+      <label>仓库地址</label>
+      <input type="url" name="url" value="{{ form.url or '' }}" placeholder="留空则按平台自动生成">
+    </div>
+    <div class="actions">
+      <button class="btn primary" type="submit">保存</button>
+      <a class="btn" href="{{ url_for('repos.detail', repo_id=repo.id) if repo else url_for('repos.index') }}">取消</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

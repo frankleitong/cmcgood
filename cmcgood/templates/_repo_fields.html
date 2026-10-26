@@ -1,0 +1,43 @@
+{# 新建仓库申请 / 手工登记 / 编辑 共用字段；identity=是否可编辑 平台/组织/仓库名 #}
+<div class="row">
+  <div class="field">
+    <label>平台</label>
+    <select name="platform" {{ 'disabled' if not identity }}>
+      {% for k, v in C.PLATFORMS.items() %}<option value="{{ k }}" {{ 'selected' if form.platform == k }}>{{ v }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="field">
+    <label>组织 / 用户</label>
+    <input type="text" name="namespace" list="ns-list" value="{{ form.namespace or '' }}" required {{ 'disabled' if not identity }}>
+    <datalist id="ns-list">{% for p, ns in ns_choices %}<option value="{{ ns }}">{{ C.PLATFORMS[p] }}</option>{% endfor %}</datalist>
+  </div>
+  <div class="field">
+    <label>仓库名</label>
+    <input type="text" name="name" value="{{ form.name or '' }}" required pattern="[A-Za-z0-9_][A-Za-z0-9._\-]{0,99}" {{ 'disabled' if not identity }}>
+  </div>
+</div>
+<div class="field">
+  <label>用途描述</label>
+  <input type="text" name="description" value="{{ form.description or '' }}" placeholder="一句话说明这个仓库放什么代码">
+</div>
+<div class="row">
+  <div class="field">
+    <label>所属团队</label>
+    <input type="text" name="team" list="team-list" value="{{ form.team or '' }}">
+    <datalist id="team-list">{% for t in teams %}<option value="{{ t }}">{% endfor %}</datalist>
+  </div>
+  <div class="field">
+    <label>负责人</label>
+    <select name="owner_id" {{ 'disabled' if not owner_editable }}>
+      <option value="">（未指定）</option>
+      {% for u in users %}<option value="{{ u.id }}" {{ 'selected' if (form.owner_id|string) == (u.id|string) }}>{{ u.display_name or u.username }}（{{ u.username }}）</option>{% endfor %}
+    </select>
+    <div class="hint">负责人会收到不活跃提醒</div>
+  </div>
+  <div class="field">
+    <label>可见性</label>
+    <select name="visibility">
+      {% for k, v in C.VISIBILITY.items() %}<option value="{{ k }}" {{ 'selected' if form.visibility == k }}>{{ v }}</option>{% endfor %}
+    </select>
+  </div>
+</div>

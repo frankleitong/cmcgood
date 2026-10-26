@@ -1,0 +1,20 @@
+{% macro badge(mapping, key) -%}
+  {%- set item = mapping.get(key) -%}
+  {%- if item -%}<span class="badge {{ item[1] }}">{{ item[0] }}</span>{%- else -%}<span class="badge gray">{{ key }}</span>{%- endif -%}
+{%- endmacro %}
+
+{% macro repo_name(r) -%}
+  <span class="muted">{{ C.PLATFORMS.get(r.platform, r.platform) }} ·</span> <span class="mono">{{ r.namespace }}/<strong>{{ r.name }}</strong></span>
+{%- endmacro %}
+
+{% macro user_name(username, display) -%}
+  {%- if username -%}{{ display or username }}{%- else -%}<span class="muted">未指定</span>{%- endif -%}
+{%- endmacro %}
+
+{% macro platform_state(r) -%}
+  {%- if r.on_platform == 1 -%}<span class="badge green" title="最近扫描于 {{ r.last_seen_at|fmt_time }}">平台存在</span>
+  {%- elif r.on_platform == 0 -%}<span class="badge red">平台未发现</span>
+  {%- else -%}<span class="badge gray">未扫描</span>{%- endif -%}
+{%- endmacro %}
+
+{% macro csrf() -%}<input type="hidden" name="_csrf" value="{{ csrf_token() }}">{%- endmacro %}

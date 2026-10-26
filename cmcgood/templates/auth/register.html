@@ -1,0 +1,18 @@
+{% extends 'base.html' %}
+{% from '_macros.html' import csrf %}
+{% block title %}注册{% endblock %}
+{% block content %}
+<div class="auth-box panel">
+  <h1>注册</h1>
+  <form method="post">
+    {{ csrf() }}
+    <div class="field"><label>用户名</label><input type="text" name="username" required value="{{ request.form.username }}"><div class="hint">建议使用工号或邮箱前缀</div></div>
+    <div class="field"><label>姓名</label><input type="text" name="display_name" value="{{ request.form.display_name }}"></div>
+    <div class="field"><label>邮箱</label><input type="email" name="email" required value="{{ request.form.email }}"><div class="hint">用于接收审批结果和归档提醒</div></div>
+    <div class="field"><label>密码</label><input type="password" name="password" required minlength="8"></div>
+    <div class="field"><label>确认密码</label><input type="password" name="password2" required minlength="8"></div>
+    <button class="btn primary" type="submit">注册</button>
+    <span class="muted" style="margin-left:12px">已有账号？<a href="{{ url_for('auth.login') }}">登录</a></span>
+  </form>
+</div>
+{% endblock %}

@@ -1,0 +1,26 @@
+{% extends 'base.html' %}
+{% from '_macros.html' import csrf %}
+{% block title %}申请新仓库{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>申请新建代码仓</h1>
+    <p class="sub">提交后由审批人审核，通过后自动登记到代码仓列表{% if config.AUTO_CREATE_REPO %}，并在平台上自动创建{% endif %}。</p>
+  </div>
+</div>
+<div class="panel" style="max-width:860px">
+  <form method="post">
+    {{ csrf() }}
+    {% set identity = true %}{% set owner_editable = true %}
+    {% include '_repo_fields.html' %}
+    <div class="field">
+      <label>申请理由</label>
+      <textarea name="reason" required placeholder="为什么需要新建这个仓库？能否复用已有仓库？">{{ form.reason or '' }}</textarea>
+    </div>
+    <div class="actions">
+      <button class="btn primary" type="submit">提交申请</button>
+      <a class="btn" href="{{ url_for('repos.index') }}">取消</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

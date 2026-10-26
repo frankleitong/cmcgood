@@ -1,0 +1,77 @@
+{% extends 'base.html' %}
+{% from '_macros.html' import badge, repo_name, user_name, platform_state %}
+{% block title %}代码仓{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>代码仓</h1>
+    <p class="sub">{% if last_sync %}最近一次一致性扫描：{{ last_sync.finished_at|fmt_time }}{% else %}尚未执行过一致性扫描{% endif %}</p>
+  </div>
+  <div class="actions">
+    <a class="btn primary" href="{{ url_for('applications.new') }}">申请新仓库</a>
+    {% if has_role(g.user, 'admin') %}<a class="btn" href="{{ url_for('repos.new') }}">手工登记</a>{% endif %}
+  </div>
+</div>
+
+<div class="stats">
+  <a class="stat" href="{{ url_for('repos.index', status='all') }}"><div class="n">{{ stats.total }}</div><div class="l">登记总数</div></a>
+  <a class="stat" href="{{ url_for('repos.index', status='active') }}"><div class="n">{{ stats.get('active', 0) }}</div><div class="l">活跃</div></a>
+  <a class="stat {{ 'warn' if stats.get('inactive') }}" href="{{ url_for('repos.index', status='inactive', sort='idle') }}"><div class="n">{{ stats.get('inactive', 0) }}</div><div class="l">不活跃（待归档）</div></a>
+  <a class="stat" href="{{ url_for('repos.index', status='archived') }}"><div class="n">{{ stats.get('archived', 0) }}</div><div class="l">已归档</div></a>
+  <a class="stat {{ 'bad' if stats.missing }}" href="{{ url_for('repos.index', status='missing') }}"><div class="n">{{ stats.missing }}</div><div class="l">平台未发现</div></a>
+  <a class="stat {{ 'warn' if stats.unregistered }}" href="{{ url_for('scans.index') if has_role(g.user, 'approver') else '#' }}"><div class="n">{{ stats.unregistered }}</div><div class="l">平台上未登记</div></a>
+  <a class="stat {{ 'warn' if stats.pending }}" href="{{ url_for('applications.index') }}"><div class="n">{{ stats.pending }}</div><div class="l">待审批申请</div></a>
+</div>
+
+<div class="panel flush">
+  <form class="filters" method="get">
+    <input type="search" name="q" placeholder="搜索仓库名 / 组织 / 描述 / 团队" value="{{ args.q }}" style="min-width:240px">
+    <select name="platform">
+      <option value="">全部平台</option>
+      {% for k, v in C.PLATFORMS.items() %}<option value="{{ k }}" {{ 'selected' if args.platform == k }}>{{ v }}</option>{% endfor %}
+    </select>
+    <select name="status">
+      <option value="">未归档</option>
+      <option value="all" {{ 'selected' if args.status == 'all' }}>全部状态</option>
+      {% for k, v in C.REPO_STATUS.items() %}<option value="{{ k }}" {{ 'selected' if args.status == k }}>{{ v[0] }}</option>{% endfor %}
+      <option value="missing" {{ 'selected' if args.status == 'missing' }}>平台未发现</option>
+    </select>
+    <select name="team">
+      <option value="">全部团队</option>
+      {% for t in teams %}<option {{ 'selected' if args.team == t }}>{{ t }}</option>{% endfor %}
+    </select>
+    <select name="sort">
+      <option value="name" {{ 'selected' if sort == 'name' }}>按名称</option>
+      <option value="idle" {{ 'selected' if sort == 'idle' }}>最久未合入优先</option>
+      <option value="activity" {{ 'selected' if sort == 'activity' }}>最近合入优先</option>
+      <option value="created" {{ 'selected' if sort == 'created' }}>最新登记优先</option>
+    </select>
+    <label class="muted"><input type="checkbox" name="mine" value="1" {{ 'checked' if args.mine }}> 只看我负责的</label>
+    <button class="btn" type="submit">筛选</button>
+    <span class="muted small" style="margin-left:auto">共 {{ repos|length }} 个</span>
+  </form>
+  {% if repos %}
+  <table>
+    <thead><tr><th>仓库</th><th>团队</th><th>负责人</th><th>状态</th><th>平台</th><th>最近合入</th><th class="num" title="近 {{ config.ACTIVITY_WINDOW_DAYS }} 天默认分支提交数">近{{ config.ACTIVITY_WINDOW_DAYS }}天提交</th></tr></thead>
+    <tbody>
+    {% for r in repos %}
+      <tr>
+        <td>
+          <a href="{{ url_for('repos.detail', repo_id=r.id) }}">{{ repo_name(r) }}</a>
+          {% if r.description %}<div class="desc">{{ r.description }}</div>{% endif %}
+        </td>
+        <td>{{ r.team or '—' }}</td>
+        <td>{{ user_name(r.owner_username, r.owner_name) }}</td>
+        <td>{{ badge(C.REPO_STATUS, r.status) }}</td>
+        <td>{{ platform_state(r) }}</td>
+        <td title="{{ r.last_commit_at|fmt_time }}">{{ r.last_commit_at|ago if r.last_commit_at else ('—' if not r.activity_checked_at else '无提交') }}</td>
+        <td class="num">{% if r.recent_commits is none %}—{% elif r.recent_commits >= 100 %}100+{% else %}{{ r.recent_commits }}{% endif %}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="empty">没有符合条件的代码仓。{% if has_role(g.user, 'admin') and not stats.total %}<br>可以先到「扫描」页执行一次一致性扫描，把平台上已有的仓库批量导入。{% endif %}</div>
+  {% endif %}
+</div>
+{% endblock %}

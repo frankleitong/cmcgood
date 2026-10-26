@@ -1,0 +1,10 @@
+[Unit]
+Description=cmcgood 每天备份数据库
+
+[Timer]
+OnCalendar=*-*-* 03:30:00
+Persistent=true
+Unit=cmcgood-task@backup.service
+
+[Install]
+WantedBy=timers.target

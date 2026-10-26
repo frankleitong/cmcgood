@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}{% endblock %} · {{ config.SITE_NAME }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<header class="topbar">
+  <div class="wrap topbar-inner">
+    <a class="brand" href="{{ url_for('repos.index') }}">{{ config.SITE_NAME }}</a>
+    {% if g.user %}
+    {% set ep = request.endpoint or '' %}
+    <nav class="nav">
+      <a href="{{ url_for('repos.index') }}" class="{{ 'on' if ep.startswith('repos.') }}">代码仓</a>
+      <a href="{{ url_for('applications.new') }}" class="{{ 'on' if ep == 'applications.new' }}">申请新仓库</a>
+      <a href="{{ url_for('applications.index') }}" class="{{ 'on' if ep.startswith('applications.') and ep != 'applications.new' }}">申请与审批{% if nav_pending %}<span class="pill">{{ nav_pending }}</span>{% endif %}</a>
+      {% if has_role(g.user, 'approver') %}<a href="{{ url_for('scans.index') }}" class="{{ 'on' if ep.startswith('scans.') }}">扫描</a>{% endif %}
+      {% if has_role(g.user, 'admin') %}<a href="{{ url_for('admin.users') }}" class="{{ 'on' if ep.startswith('admin.') }}">用户</a>{% endif %}
+    </nav>
+    <div class="me">
+      <a href="{{ url_for('auth.profile') }}">{{ g.user.display_name or g.user.username }}</a>
+      <span>（{{ C.ROLES[g.user.role] }}）</span> · <a href="{{ url_for('auth.logout') }}">退出</a>
+    </div>
+    {% endif %}
+  </div>
+</header>
+<main class="wrap">
+  {% for cat, msg in get_flashed_messages(with_categories=true) %}
+    <div class="flash {{ cat }}">{{ msg }}</div>
+  {% endfor %}
+  {% block content %}{% endblock %}
+</main>
+</body>
+</html>

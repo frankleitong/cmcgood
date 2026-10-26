@@ -1,0 +1,12 @@
+[Unit]
+Description=cmcgood 定时任务: %i
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=@APP_USER@
+Group=@APP_USER@
+WorkingDirectory=@APP_DIR@
+Environment=CMCGOOD_CONFIG=@CONF_FILE@
+ExecStart=@APP_DIR@/venv/bin/flask --app wsgi %i

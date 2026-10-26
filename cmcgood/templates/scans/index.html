@@ -1,0 +1,144 @@
+{% extends 'base.html' %}
+{% from '_macros.html' import badge, csrf %}
+{% block title %}扫描{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>扫描</h1>
+    <p class="sub">服务器上由 systemd 定时执行；管理员也可以在这里手动触发。</p>
+  </div>
+</div>
+
+<div class="grid2">
+  <div class="panel">
+    <h2>登记一致性扫描</h2>
+    <p class="muted small">对比登记表与平台上的实际仓库：找出「平台有但未登记」「已登记但平台上找不到」「平台已归档但登记未同步」的仓库。</p>
+    <dl class="kv">
+      <dt>扫描范围</dt>
+      <dd>{% for p, pc in platforms.items() %}
+          <div>{{ C.PLATFORMS[p] }}：{% if pc.namespaces %}<span class="mono">{{ pc.namespaces|join(', ') }}</span>{% else %}<span class="muted">未配置</span>{% endif %}
+            {% if not pc.token %}<span class="badge orange">无 token</span>{% endif %}</div>
+          {% endfor %}
+          <div class="muted small">不在范围内的已登记仓库会逐个查询是否存在。</div></dd>
+      {% if sync_run %}
+      {% set s = sync_run.summary|from_json %}
+      <dt>本次结果</dt><dd>#{{ sync_run.id }} {{ badge(C.RUN_STATUS, sync_run.status) }} {{ sync_run.finished_at|fmt_time }}
+        <div>平台仓库 {{ s.remote }} · 匹配 {{ s.matched }} · 未登记 {{ s.unregistered }} · 平台未发现 {{ s.missing }} · 平台已归档 {{ s.platform_archived }}</div></dd>
+      {% endif %}
+    </dl>
+    {% if has_role(g.user, 'admin') %}
+    <form method="post" action="{{ url_for('scans.run') }}" style="margin-top:12px">
+      {{ csrf() }}<input type="hidden" name="kind" value="sync">
+      <button class="btn primary" {{ 'disabled' if running.sync }}>{{ '运行中…' if running.sync else '立即扫描' }}</button>
+    </form>
+    {% endif %}
+  </div>
+  <div class="panel">
+    <h2>活跃度检查</h2>
+    <p class="muted small">读取每个登记仓默认分支的最近提交；超过 {{ config.INACTIVE_DAYS }} 天无合入标记为不活跃，并提醒负责人归档。</p>
+    {% if activity_run %}
+    {% set s = activity_run.summary|from_json %}
+    <dl class="kv">
+      <dt>上次检查</dt><dd>#{{ activity_run.id }} {{ badge(C.RUN_STATUS, activity_run.status) }} {{ activity_run.finished_at|fmt_time }}</dd>
+      <dt>结果</dt><dd>检查 {{ s.checked }} · 活跃 {{ s.active }} · <a href="{{ url_for('repos.index', status='inactive', sort='idle') }}">不活跃 {{ s.inactive }}</a> · 新变为不活跃 {{ s.became_inactive }} · 已提醒 {{ s.reminded }}</dd>
+    </dl>
+    {% endif %}
+    {% if has_role(g.user, 'admin') %}
+    <form method="post" action="{{ url_for('scans.run') }}" style="margin-top:12px">
+      {{ csrf() }}<input type="hidden" name="kind" value="activity">
+      <label class="muted small"><input type="checkbox" name="remind" value="1"> 同时发送提醒</label>
+      <button class="btn primary" {{ 'disabled' if running.activity }}>{{ '运行中…' if running.activity else '立即检查' }}</button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+
+{% if sync_run %}
+{% set s = sync_run.summary|from_json %}
+{% if sync_run.error or s.errors %}
+<div class="panel">
+  <h2>错误</h2>
+  {% if sync_run.error %}<p class="mono">{{ sync_run.error }}</p>{% endif %}
+  {% for e in s.errors %}<div class="mono small">{{ e }}</div>{% endfor %}
+</div>
+{% endif %}
+
+<div class="panel flush">
+  <div class="filters">
+    <strong>扫描 #{{ sync_run.id }} 发现的问题</strong>
+    <span class="muted small">{{ findings|selectattr('resolved_at', 'none')|list|length }} 个待处理</span>
+    {% if has_role(g.user, 'admin') and findings|selectattr('issue', 'equalto', 'unregistered')|selectattr('resolved_at', 'none')|list %}
+    <form class="inline" method="post" action="{{ url_for('scans.import_all', run_id=sync_run.id) }}" style="margin-left:auto" onsubmit="return confirm('把所有「平台存在，未登记」的仓库导入登记表？')">
+      {{ csrf() }}<button class="btn sm">全部导入登记表</button>
+    </form>
+    {% endif %}
+  </div>
+  {% if findings %}
+  <table>
+    <thead><tr><th>问题</th><th>仓库</th><th>描述</th><th>处理</th></tr></thead>
+    {% for f in findings %}
+    <tr class="{{ 'done' if f.resolved_at }}">
+      <td>{{ badge(C.FINDING_ISSUE, f.issue) }}</td>
+      <td><span class="muted">{{ C.PLATFORMS.get(f.platform) }} ·</span>
+        {% if f.url %}<a class="mono" href="{{ f.url }}" target="_blank" rel="noopener">{{ f.namespace }}/{{ f.name }}</a>{% else %}<span class="mono">{{ f.namespace }}/{{ f.name }}</span>{% endif %}
+        {% if f.repo_id %} · <a href="{{ url_for('repos.detail', repo_id=f.repo_id) }}">登记记录</a>{% endif %}</td>
+      <td class="desc">{{ f.description }}</td>
+      <td>
+        {% if f.resolved_at %}<span class="muted small">{{ f.resolution }}</span>
+        {% elif has_role(g.user, 'admin') %}
+        <div class="actions">
+          {% if f.issue == 'unregistered' %}
+            <form class="inline" method="post" action="{{ url_for('scans.resolve', fid=f.id) }}">{{ csrf() }}<button class="btn sm" name="action" value="import">导入</button></form>
+            <form class="inline" method="post" action="{{ url_for('scans.resolve', fid=f.id) }}">{{ csrf() }}<button class="btn sm" name="action" value="ignore" title="以后扫描不再提示">忽略</button></form>
+          {% elif f.issue == 'platform_archived' %}
+            <form class="inline" method="post" action="{{ url_for('scans.resolve', fid=f.id) }}">{{ csrf() }}<button class="btn sm" name="action" value="archive">同步为已归档</button></form>
+          {% endif %}
+          <form class="inline" method="post" action="{{ url_for('scans.resolve', fid=f.id) }}">{{ csrf() }}<button class="btn sm" name="action" value="dismiss">已知悉</button></form>
+        </div>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}<div class="empty">登记表与平台完全一致 🎉</div>{% endif %}
+</div>
+{% endif %}
+
+<div class="panel flush">
+  <table>
+    <thead><tr><th>#</th><th>任务</th><th>状态</th><th>触发</th><th>开始</th><th>结束</th><th>摘要</th></tr></thead>
+    {% for r in runs %}
+    {% set s = r.summary|from_json %}
+    <tr>
+      <td>{% if r.kind == 'sync' %}<a href="{{ url_for('scans.index', run=r.id) }}">#{{ r.id }}</a>{% else %}#{{ r.id }}{% endif %}</td>
+      <td>{{ C.RUN_KIND[r.kind] }}</td>
+      <td>{{ badge(C.RUN_STATUS, r.status) }}</td>
+      <td>{{ r.triggered_by }}</td>
+      <td>{{ r.started_at|fmt_time }}</td>
+      <td>{{ r.finished_at|fmt_time }}</td>
+      <td class="small muted">
+        {% if r.kind == 'sync' %}匹配 {{ s.matched }} · 未登记 {{ s.unregistered }} · 未发现 {{ s.missing }}
+        {% else %}检查 {{ s.checked }} · 不活跃 {{ s.inactive }} · 提醒 {{ s.reminded }}{% endif %}
+        {% if s.errors %} · <span style="color:var(--red)">错误 {{ s.errors|length }}</span>{% endif %}
+        {% if r.error %} · <span style="color:var(--red)" title="{{ r.error }}">异常</span>{% endif %}
+      </td>
+    </tr>
+    {% else %}<tr><td colspan="7" class="empty">还没有运行过</td></tr>{% endfor %}
+  </table>
+</div>
+
+{% if ignores %}
+<div class="panel flush">
+  <table>
+    <thead><tr><th>忽略列表（不纳入登记管理）</th><th>操作人</th><th>时间</th><th></th></tr></thead>
+    {% for i in ignores %}
+    <tr><td><span class="muted">{{ C.PLATFORMS.get(i.platform) }} ·</span> <span class="mono">{{ i.namespace }}/{{ i.name }}</span></td>
+      <td>{{ i.created_by }}</td><td>{{ i.created_at|fmt_time }}</td>
+      <td>{% if has_role(g.user, 'admin') %}<form class="inline" method="post" action="{{ url_for('scans.unignore') }}">{{ csrf() }}
+        <input type="hidden" name="platform" value="{{ i.platform }}"><input type="hidden" name="namespace" value="{{ i.namespace }}"><input type="hidden" name="name" value="{{ i.name }}">
+        <button class="btn sm">取消忽略</button></form>{% endif %}</td></tr>
+    {% endfor %}
+  </table>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,24 @@
+{% extends 'base.html' %}
+{% block title %}用户{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>用户</h1><p class="sub">审批人可以审批申请、查看扫描结果；管理员还可以管理用户、登记/导入仓库、触发扫描。</p></div>
+  <a class="btn primary" href="{{ url_for('admin.user_new') }}">新建用户</a>
+</div>
+<div class="panel flush">
+  <table>
+    <thead><tr><th>用户名</th><th>姓名</th><th>邮箱</th><th>角色</th><th>状态</th><th class="num">负责仓库</th><th>创建时间</th></tr></thead>
+    {% for u in users %}
+    <tr>
+      <td><a href="{{ url_for('admin.user_edit', user_id=u.id) }}">{{ u.username }}</a></td>
+      <td>{{ u.display_name or '—' }}</td>
+      <td>{{ u.email or '—' }}</td>
+      <td>{{ C.ROLES.get(u.role, u.role) }}</td>
+      <td>{% if u.active %}<span class="badge green">正常</span>{% else %}<span class="badge gray">停用</span>{% endif %}</td>
+      <td class="num">{{ u.repo_count }}</td>
+      <td>{{ u.created_at|fmt_date }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+{% endblock %}

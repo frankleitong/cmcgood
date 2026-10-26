@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+{% from '_macros.html' import csrf %}
+{% block title %}{{ '编辑用户' if user else '新建用户' }}{% endblock %}
+{% block content %}
+<div class="page-head"><h1>{{ '编辑用户 ' ~ user.username if user else '新建用户' }}</h1></div>
+<div class="panel" style="max-width:560px">
+  <form method="post">
+    {{ csrf() }}
+    <div class="field"><label>用户名</label>
+      {% if user %}<input type="text" value="{{ user.username }}" disabled>{% else %}<input type="text" name="username" value="{{ form.username or '' }}" required>{% endif %}</div>
+    <div class="field"><label>姓名</label><input type="text" name="display_name" value="{{ form.display_name or '' }}"></div>
+    <div class="field"><label>邮箱</label><input type="email" name="email" value="{{ form.email or '' }}"></div>
+    <div class="row">
+      <div class="field"><label>角色</label>
+        <select name="role">{% for k, v in C.ROLES.items() %}<option value="{{ k }}" {{ 'selected' if form.role == k }}>{{ v }}</option>{% endfor %}</select></div>
+      {% if user %}
+      <div class="field"><label>状态</label>
+        <select name="active"><option value="1" {{ 'selected' if (form.active|string) == '1' }}>正常</option><option value="0" {{ 'selected' if (form.active|string) == '0' }}>停用</option></select></div>
+      {% endif %}
+    </div>
+    <div class="row">
+      <div class="field"><label>{{ '重置密码（不改请留空）' if user else '初始密码' }}</label><input type="password" name="password" minlength="8" {{ '' if user else 'required' }}></div>
+      <div class="field"><label>确认密码</label><input type="password" name="password2" minlength="8" {{ '' if user else 'required' }}></div>
+    </div>
+    <div class="actions">
+      <button class="btn primary" type="submit">保存</button>
+      <a class="btn" href="{{ url_for('admin.users') }}">取消</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

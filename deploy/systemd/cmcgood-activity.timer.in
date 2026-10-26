@@ -1,0 +1,10 @@
+[Unit]
+Description=cmcgood 每周一活跃度检查并提醒归档
+
+[Timer]
+OnCalendar=Mon *-*-* 09:30:00
+Persistent=true
+Unit=cmcgood-task@check-activity.service
+
+[Install]
+WantedBy=timers.target

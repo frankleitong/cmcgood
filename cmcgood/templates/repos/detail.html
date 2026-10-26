@@ -1,0 +1,105 @@
+{% extends 'base.html' %}
+{% from '_macros.html' import badge, repo_name, user_name, platform_state, csrf %}
+{% block title %}{{ repo.namespace }}/{{ repo.name }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>{{ repo_name(repo) }}</h1>
+    <p class="sub">{{ badge(C.REPO_STATUS, repo.status) }} {{ platform_state(repo) }}
+      {% if repo.url %}<a href="{{ repo.url }}" target="_blank" rel="noopener">在 {{ C.PLATFORMS.get(repo.platform) }} 上打开 ↗</a>{% endif %}</p>
+  </div>
+  <div class="actions">
+    {% if can_manage %}<a class="btn" href="{{ url_for('repos.edit', repo_id=repo.id) }}">编辑</a>{% endif %}
+    {% if has_role(g.user, 'admin') and repo.status == 'archived' %}
+      <form class="inline" method="post" action="{{ url_for('repos.restore', repo_id=repo.id) }}">{{ csrf() }}<button class="btn">恢复为活跃</button></form>
+    {% endif %}
+  </div>
+</div>
+
+<div class="grid2">
+  <div>
+    <div class="panel">
+      <dl class="kv">
+        <dt>描述</dt><dd>{{ repo.description or '—' }}</dd>
+        <dt>团队</dt><dd>{{ repo.team or '—' }}</dd>
+        <dt>负责人</dt><dd>{{ user_name(repo.owner_username, repo.owner_name) }}{% if repo.owner_email %} <span class="muted">{{ repo.owner_email }}</span>{% endif %}</dd>
+        <dt>可见性</dt><dd>{{ C.VISIBILITY.get(repo.visibility, repo.visibility) }}</dd>
+        <dt>来源</dt><dd>{{ C.REPO_SOURCE.get(repo.source, repo.source) }}{% if repo.application_id %}（<a href="{{ url_for('applications.detail', app_id=repo.application_id) }}">申请 #{{ repo.application_id }}</a>）{% endif %}</dd>
+        <dt>登记时间</dt><dd>{{ repo.created_at|fmt_time }}</dd>
+        <dt>地址</dt><dd>{% if repo.url %}<a class="mono" href="{{ repo.url }}" target="_blank" rel="noopener">{{ repo.url }}</a>{% else %}—{% endif %}</dd>
+        {% if repo.archived_at %}<dt>归档时间</dt><dd>{{ repo.archived_at|fmt_time }}</dd>{% endif %}
+      </dl>
+    </div>
+
+    <div class="panel">
+      <h2>操作历史</h2>
+      {% if events %}
+      <ul class="timeline">
+        {% for e in events %}
+        <li><span class="muted small">{{ e.created_at|fmt_time }}</span> · {{ e.display_name or e.username or '系统' }} · {{ e.detail or e.action }}</li>
+        {% endfor %}
+      </ul>
+      {% else %}<p class="muted">暂无记录</p>{% endif %}
+    </div>
+
+    {% if apps %}
+    <div class="panel flush">
+      <table>
+        <thead><tr><th>相关申请</th><th>申请人</th><th>状态</th><th>时间</th></tr></thead>
+        {% for a in apps %}
+        <tr><td><a href="{{ url_for('applications.detail', app_id=a.id) }}">#{{ a.id }} {{ C.APP_KIND[a.kind] }}</a></td>
+            <td>{{ a.applicant_name or a.applicant_username }}</td><td>{{ badge(C.APP_STATUS, a.status) }}</td><td>{{ a.created_at|fmt_time }}</td></tr>
+        {% endfor %}
+      </table>
+    </div>
+    {% endif %}
+  </div>
+
+  <div>
+    <div class="panel">
+      <h2>活跃度</h2>
+      <dl class="kv">
+        <dt>最近合入</dt><dd>{% if repo.last_commit_at %}{{ repo.last_commit_at|fmt_time }}（{{ repo.last_commit_at|ago }}）{% elif repo.activity_checked_at %}无提交{% else %}—{% endif %}</dd>
+        <dt>近{{ config.ACTIVITY_WINDOW_DAYS }}天提交</dt><dd>{% if repo.recent_commits is none %}—{% elif repo.recent_commits >= 100 %}100+{% else %}{{ repo.recent_commits }}{% endif %}</dd>
+        <dt>上次检查</dt><dd>{{ repo.activity_checked_at|fmt_time }}</dd>
+        <dt>上次提醒</dt><dd>{{ repo.last_reminded_at|fmt_time }}</dd>
+        {% if repo.snooze_until %}<dt>暂不归档至</dt><dd>{{ repo.snooze_until|fmt_date }}<div class="muted small">{{ repo.snooze_reason }}</div></dd>{% endif %}
+      </dl>
+      <p class="muted small" style="margin-bottom:0">超过 {{ config.INACTIVE_DAYS }} 天默认分支无新提交即判定为不活跃，并每 {{ config.REMIND_INTERVAL_DAYS }} 天提醒负责人一次。</p>
+    </div>
+
+    {% if can_manage and repo.status != 'archived' %}
+    <div class="panel">
+      <h2>归档</h2>
+      {% if pending_archive %}
+        <p class="muted">已有归档申请在审批中。</p>
+      {% else %}
+      <form method="post" action="{{ url_for('repos.archive_request', repo_id=repo.id) }}">
+        {{ csrf() }}
+        <div class="field"><textarea name="reason" placeholder="归档理由，例如：项目已结束 / 已迁移到 xxx" required></textarea></div>
+        <button class="btn primary">申请归档</button>
+      </form>
+      {% if repo.status == 'inactive' %}
+      <hr style="border:none;border-top:1px solid var(--line);margin:16px 0">
+      <form method="post" action="{{ url_for('repos.snooze', repo_id=repo.id) }}">
+        {{ csrf() }}
+        <div class="field"><textarea name="reason" placeholder="仍需保留的理由" required></textarea>
+          <div class="hint">提交后 {{ config.SNOOZE_DAYS }} 天内不再提醒</div></div>
+        <button class="btn">暂不归档</button>
+      </form>
+      {% endif %}
+      {% endif %}
+    </div>
+    {% endif %}
+
+    {% if has_role(g.user, 'admin') %}
+    <div class="panel">
+      <h2>管理员</h2>
+      <form method="post" action="{{ url_for('repos.delete', repo_id=repo.id) }}" onsubmit="return confirm('只删除登记记录，不会删除平台上的仓库。确定删除？')">
+        {{ csrf() }}<button class="btn danger sm">删除登记记录</button>
+      </form>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
